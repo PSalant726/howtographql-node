@@ -1,59 +1,37 @@
 const { GraphQLServer } = require('graphql-yoga');
-let links = [{
-  id: 'link-0',
-  url: 'www.howtographql.com',
-  description: 'Fullstack tutorial for GraphQL'
-}];
-let idCount = links.length;
+const { Prisma } = require('prisma-binding')
+
 const resolvers = {
   Query: {
     info: () => `This is the API of a Hackernews Clone`,
-    feed: () => links,
-    link: (root, args) => {
-      return links.find(link => { return link.id === args.id; });
-    }
+    feed: (root, args, context, info) => {
+      return context.db.query.links({}, info);
+    },
   },
   Mutation: {
-    createLink: (root, args) => {
-      const link = {
-        id: `link-${idCount++}`,
-        description: args.description,
-        url: args.url,
-      };
-
-      links.push(link);
-
-      return link;
-    },
-
-    updateLink: (root, args) => {
-      for (let i = 0; i < links.length; i++) {
-        const link = links[i];
-
-        if (link.id === args.id) {
-          link.description = args.description;
-          link.url = args.url;
-
-          return link;
+    post: (root, args, context, info) => {
+      return context.db.mutation.createLink({
+        data: {
+          url: args.url,
+          description: args.description
         }
-      }
+      }, info);
     },
-
-    deleteLink: (root, args) => {
-      const removeIndex = links.findIndex(link => { return link.id === args.id; });
-      const removedLink = links[removeIndex];
-
-      if (removedLink) {
-        links.splice(removeIndex, 1);
-
-        return removedLink;
-      }
-    }
-  }
+  },
 };
 const server = new GraphQLServer({
   typeDefs: './src/schema.graphql',
-  resolvers
-});
+  resolvers,
+  context: req => ({
+    ...req,
+    db: new Prisma({
+      typeDefs: 'src/generated/prisma.graphql',
+      endpoint: 'https://us1.prisma.sh/phil-salant-e9e9a4/database/dev',
+      secret: 'mysecret123',
+      debug: true
+    })
+  })
+})
+
 
 server.start(() => console.log(`Server is running on http://localhost:4000`)); // eslint-disable-line
